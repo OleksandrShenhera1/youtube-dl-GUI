@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
 )
 
 from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import pyqtSignal
 
 def create_main_widget(parent_window):
 
@@ -18,6 +19,7 @@ def create_main_widget(parent_window):
     parent_window.url_line = QLineEdit()
     parent_window.url_line.setPlaceholderText("url:")
     parent_window.url_btn = QPushButton("Add")
+    parent_window.url_btn.clicked.connect(parent_window.add_video)
     media_block.addWidget(parent_window.url_line)
     media_block.addWidget(parent_window.url_btn)
 
@@ -53,15 +55,20 @@ def create_main_widget(parent_window):
     parent_window.output_dir_line = QLineEdit()
     parent_window.output_dir_line.setPlaceholderText("C:\\User\\Name\\Videos")
     parent_window.output_dir_btn = QPushButton("Browse")
+    parent_window.output_dir_btn.clicked.connect(parent_window.browse_directory)
+    parent_window.start_btn = QPushButton("Start")
 
     bottom_settings.addWidget(parent_window.video_sett_combo)
     bottom_settings.addWidget(parent_window.output_dir_line)
     bottom_settings.addWidget(parent_window.output_dir_btn)
-
     settings_layout.addLayout(upper_settings)
     settings_layout.addLayout(bottom_settings)
 
+    start_settings = QHBoxLayout()
+    start_settings.addWidget(parent_window.start_btn)
+    settings_layout.addLayout(start_settings)
     right_box.addWidget(settings_block)
+
 
     preview_group = QGroupBox("Video preview")
     preview_layout = QHBoxLayout(preview_group)
