@@ -1,10 +1,86 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QGroupBox,
-    QComboBox, QLabel, QLineEdit, QProgressBar, QTextEdit, QCheckBox, QTextBrowser
+    QComboBox, QLabel, QLineEdit, QProgressBar, QTextEdit, QCheckBox, QTextBrowser, QSizePolicy
 )
-
+import requests
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt, QSize
+
+class VideoPreview(QWidget):
+    def __init__(self, video_dict=None, parent=None):
+        super().__init__(parent)
+        main_layout = QVBoxLayout(self)
+
+        self.url_line = QLineEdit()
+        self.url_line.setPlaceholderText("video url")
+        self.url_line.setReadOnly(True)
+        main_layout.addWidget(self.url_line)
+
+        center_layout = QHBoxLayout()
+        main_layout.addLayout(center_layout)
+
+        left_layout = QVBoxLayout()
+        center_layout.addLayout(left_layout, stretch=2)
+
+        self.thumbnail_label = QLabel()
+        self.thumbnail_label.setObjectName("thumbnail")
+        self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.thumbnail_label.setFixedSize(360, 240)
+        left_layout.addWidget(self.thumbnail_label)
+
+        self.title_label = QLabel()
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.title_label.setWordWrap(True)
+        left_layout.addWidget(self.title_label)
+
+        right_layout = QVBoxLayout()
+        center_layout.addLayout(right_layout, stretch=1)
+
+        self.author_label = QLabel()
+        right_layout.addWidget(self.author_label)
+
+        self.description_edit = QTextEdit()
+        self.description_edit.setReadOnly(True)
+        #self.description_edit.setMaximumHeight(90)
+        self.description_edit.setFixedWidth(350)
+        self.description_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        right_layout.addWidget(self.description_edit)
+
+        self.clear()
+
+        if video_dict:
+            self.set_video(video_dict)
+
+    def set_video(self, video_dict):
+        self.url_line.setText(video_dict.get('webpage_url', ''))
+        self.title_label.setText(f"Title: {video_dict.get('title', '')}")
+        self.author_label.setText(f"Author: {video_dict.get('author', '')}")
+        self.description_edit.setText(video_dict.get('description', ''))
+
+        thumb_url = video_dict.get('thumbnail')
+        if thumb_url:
+            try:
+                response = requests.get(thumb_url)
+                pixmap = QPixmap()
+                pixmap.loadFromData(response.content)
+                self.thumbnail_label.setPixmap(pixmap.scaled(
+                    self.thumbnail_label.width(),
+                    self.thumbnail_label.height(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                ))
+            except Exception:
+                self.thumbnail_label.setText("No preview")
+        else:
+            self.thumbnail_label.setText("No preview")
+
+    def clear(self):
+        self.url_line.clear()
+        self.title_label.clear()
+        self.author_label.clear()
+        self.description_edit.clear()
+        self.thumbnail_label.clear()
+
 
 def create_main_widget(parent_window):
 
@@ -28,6 +104,7 @@ def create_main_widget(parent_window):
     media_show = QHBoxLayout(media)
 
     parent_window.media_list = QListWidget()
+    parent_window.media_list.itemClicked.connect(parent_window.on_media_item_clicked)
     media_show.addWidget(parent_window.media_list)
 
     media_block.addWidget(media)
@@ -72,9 +149,8 @@ def create_main_widget(parent_window):
 
     preview_group = QGroupBox("Video preview")
     preview_layout = QHBoxLayout(preview_group)
-    parent_window.preview_label = QLabel()
-
-    preview_layout.addWidget(parent_window.preview_label)
+    parent_window.preview_widget = VideoPreview()
+    preview_layout.addWidget(parent_window.preview_widget)
 
     right_box.addWidget(preview_group, stretch=1)
 

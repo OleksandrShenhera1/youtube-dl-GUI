@@ -70,4 +70,10 @@ QWidget {
     QLabel {
         font-weight: bold;
     }
+    QLabel#thumbnail {
+        margin-top: 25px;
+        border: 2px solid #888;
+        border-radius: 10px;
+        
+    }
 """

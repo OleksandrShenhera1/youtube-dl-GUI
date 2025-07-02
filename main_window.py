@@ -1,12 +1,15 @@
-from PyQt6.QtWidgets import QMainWindow, QFileDialog, QMessageBox
-from PyQt6.QtCore import QThread
+from PyQt6.QtWidgets import QMainWindow, QFileDialog, QMessageBox, QListWidgetItem
+from PyQt6.QtCore import QThread, Qt
 from PyQt6.QtGui import QIcon
 
 from youtube_downloader import VideoWorker
 
+import requests
+from PyQt6.QtGui import QPixmap
+
 from config import STYLESHEET
 from ui_components import create_main_widget
-
+from ui_components import VideoPreview
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -20,6 +23,7 @@ class MainWindow(QMainWindow):
 
         self.unique_url = set()
         self.video_dicts = {}
+        self.active_workers = []
 
     def add_video(self):
         url = self.url_line.text().strip()
@@ -29,35 +33,59 @@ class MainWindow(QMainWindow):
             return
 
         if url:
-            self.unique_url.add(url)
+            self.url_btn.setEnabled(False)
 
-            self.thread = QThread()
-            self.worker = VideoWorker(url)
-            self.worker.moveToThread(self.thread)
-            self.thread.started.connect(self.worker.run)
-            self.worker.finished.connect(self.on_finished)
-            self.worker.info_add.connect(self.on_add_info)
-            self.worker.error.connect(self.on_error)
-            self.worker.finished.connect(self.thread.quit)
-            self.worker.finished.connect(self.worker.deleteLater)
-            self.thread.finished.connect(self.thread.deleteLater)
-            self.thread.start()
+            thread = QThread(self)
+            worker = VideoWorker(url)
+            worker.moveToThread(thread)
+            thread.started.connect(worker.run)
+            worker.finished.connect(self.on_finished)
+            worker.info_add.connect(self.on_add_info)
+            worker.error.connect(self.on_error)
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            thread.start()
+
+            self.active_workers.append((thread, worker))
+
+            thread.finished.connect(lambda: self.cleanup_thread(thread))
 
         else:
             QMessageBox.warning(self, "Warning", "Enter url line before adding video.")
 
+
+
     def on_add_info(self, all_info):
-        print(all_info)
+        title = all_info["title"]
         url = all_info["webpage_url"]
         self.video_dicts[url] = all_info
-    def on_finished(self, info):
-        self.media_list.addItem(info)
+
+        item = QListWidgetItem(all_info["title"])
+        item.setData(Qt.ItemDataRole.UserRole, url)
+        self.media_list.addItem(item)
+
+
+
+
+    def on_finished(self, info, url):
+        self.unique_url.add(url)
+        self.url_btn.setEnabled(True)
         self.url_line.clear()
         QMessageBox.information(self, "Success", "Added to the queue.")
 
     def on_error(self, error):
+        self.url_btn.setEnabled(True)
         QMessageBox.warning(self, f"Failure", f"Could not find a video {error}")
 
+    def cleanup_thread(self, thread):
+        self.active_workers = [tw for tw in self.active_workers if tw[0] != thread]
+
+    def on_media_item_clicked(self, item):
+        url = item.data(Qt.ItemDataRole.UserRole)
+        video_info = self.video_dicts.get(url)
+        if video_info:
+            self.preview_widget.set_video(video_info)
 
     def browse_directory(self):
         directory = QFileDialog.getExistingDirectory(self, "Choose path")

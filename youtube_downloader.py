@@ -2,7 +2,7 @@ from PyQt6.QtCore import QThread, pyqtSignal, QObject
 import yt_dlp
 
 class VideoWorker(QObject):
-    finished = pyqtSignal(str)
+    finished = pyqtSignal(str, str)
     error = pyqtSignal(str)
     info_add = pyqtSignal(dict)
     def __init__(self, url):
@@ -26,7 +26,7 @@ class VideoWorker(QObject):
                 }
 
                 end_info = f"{info['title']}, duration: {str(info['duration'])} sec."
-                self.finished.emit(end_info)
+                self.finished.emit(end_info, self.url)
                 self.info_add.emit(video_dict)
         except Exception as e:
             self.error.emit(str(e))
