@@ -1,10 +1,33 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QGroupBox,
-    QComboBox, QLabel, QLineEdit, QProgressBar, QTextEdit, QCheckBox, QTextBrowser, QSizePolicy
+    QComboBox, QLabel, QLineEdit, QProgressBar, QTextEdit, QSizePolicy
 )
 import requests
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import pyqtSignal, Qt, QSize
+from PyQt6.QtCore import pyqtSignal, Qt
+
+class VideoFormat(QComboBox):
+    def __init__(self, formats=None, parent=None):
+        super().__init__(parent)
+        if formats:
+            self.add_formats(formats)
+
+
+
+    def add_formats(self, formats):
+        if not formats:
+            return
+        self.clear()
+        if any("1440p" in f for f in formats):
+            self.addItem("1440p")
+        if any("1080p" in f for f in formats):
+            self.addItem("1080p")
+        if any("720p" in f for f in formats):
+            self.addItem("720p")
+        if any("360p" in f for f in formats):
+            self.addItem("360p")
+
+
 
 class VideoPreview(QWidget):
     def __init__(self, video_dict=None, parent=None):
@@ -119,7 +142,8 @@ def create_main_widget(parent_window):
 
     upper_settings = QHBoxLayout()
 
-    parent_window.quality_combo = QComboBox()
+    parent_window.quality_combo = VideoFormat()
+    parent_window.quality_combo.currentTextChanged.connect(parent_window.on_quality_changed)
     parent_window.status_bar = QProgressBar()
     parent_window.status_bar.setValue(0)
 
@@ -134,7 +158,7 @@ def create_main_widget(parent_window):
     parent_window.output_dir_btn = QPushButton("Browse")
     parent_window.output_dir_btn.clicked.connect(parent_window.browse_directory)
     parent_window.start_btn = QPushButton("Start")
-
+    parent_window.start_btn.clicked.connect(parent_window.on_download)
     bottom_settings.addWidget(parent_window.video_sett_combo)
     bottom_settings.addWidget(parent_window.output_dir_line)
     bottom_settings.addWidget(parent_window.output_dir_btn)

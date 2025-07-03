@@ -1,15 +1,11 @@
 from PyQt6.QtWidgets import QMainWindow, QFileDialog, QMessageBox, QListWidgetItem
 from PyQt6.QtCore import QThread, Qt
-from PyQt6.QtGui import QIcon
+
 
 from youtube_downloader import VideoWorker
-
-import requests
-from PyQt6.QtGui import QPixmap
-
+from youtube_downloader import DownloadWorker
 from config import STYLESHEET
 from ui_components import create_main_widget
-from ui_components import VideoPreview
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -21,9 +17,12 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(main_widget)
         self.setStyleSheet(STYLESHEET)
 
+        self.selected_quality = None
         self.unique_url = set()
         self.video_dicts = {}
+        self.formats_by_url = {}
         self.active_workers = []
+
 
     def add_video(self):
         url = self.url_line.text().strip()
@@ -56,8 +55,7 @@ class MainWindow(QMainWindow):
 
 
 
-    def on_add_info(self, all_info):
-        title = all_info["title"]
+    def on_add_info(self, all_info, formats):
         url = all_info["webpage_url"]
         self.video_dicts[url] = all_info
 
@@ -65,7 +63,7 @@ class MainWindow(QMainWindow):
         item.setData(Qt.ItemDataRole.UserRole, url)
         self.media_list.addItem(item)
 
-
+        self.formats_by_url[url] = formats
 
 
     def on_finished(self, info, url):
@@ -83,9 +81,53 @@ class MainWindow(QMainWindow):
 
     def on_media_item_clicked(self, item):
         url = item.data(Qt.ItemDataRole.UserRole)
+        formats = self.formats_by_url[url]
         video_info = self.video_dicts.get(url)
         if video_info:
             self.preview_widget.set_video(video_info)
+            self.quality_combo.add_formats(formats)
+
+    def on_quality_changed(self, text):
+        self.selected_quality = text
+
+    def on_download(self):
+        item = self.media_list.currentItem()
+        url = item.data(Qt.ItemDataRole.UserRole)
+        quality = self.selected_quality
+        output_dir = self.output_dir_line.text().strip()
+        errors = []
+        if not output_dir:
+            errors.append("Choose output directory.")
+        if not item:
+            errors.append("Add media to download.")
+
+        if errors:
+            QMessageBox.warning(self, "Error", "\n".join(errors))
+            return
+
+
+        self.start_download(url, quality, output_dir)
+
+    def start_download(self, url, quality, output_dir):
+        self.start_btn.setEnabled(False)
+        video = quality[:-1]
+        settings = f"bestvideo[height={video}]+bestaudio/best[height={video}]"
+
+        self.thread = QThread()
+        self.worker = DownloadWorker(url, settings, output_dir)
+        self.worker.moveToThread(self.thread)
+
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.finished.connect(self.on_download_finished)
+
+        self.thread.start()
+
+    def on_download_finished(self):
+        self.start_btn.setEnabled(True)
+        QMessageBox.information(self, "Success", "Video downloaded successfully.")
 
     def browse_directory(self):
         directory = QFileDialog.getExistingDirectory(self, "Choose path")
