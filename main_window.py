@@ -4,6 +4,7 @@ from PyQt6.QtCore import QThread, Qt
 
 from youtube_downloader import VideoWorker
 from youtube_downloader import DownloadWorker
+
 from config import STYLESHEET
 from ui_components import create_main_widget
 class MainWindow(QMainWindow):
@@ -17,10 +18,12 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(main_widget)
         self.setStyleSheet(STYLESHEET)
 
+        self.selected_recode = None
         self.selected_quality = None
         self.unique_url = set()
         self.video_dicts = {}
         self.formats_by_url = {}
+        self.recode_by_url = {}
         self.active_workers = []
 
 
@@ -64,7 +67,7 @@ class MainWindow(QMainWindow):
         self.media_list.addItem(item)
 
         self.formats_by_url[url] = formats
-
+        self.recode_by_url[url] = formats
 
     def on_finished(self, info, url):
         self.unique_url.add(url)
@@ -82,18 +85,24 @@ class MainWindow(QMainWindow):
     def on_media_item_clicked(self, item):
         url = item.data(Qt.ItemDataRole.UserRole)
         formats = self.formats_by_url[url]
+        recode = self.recode_by_url[url]
         video_info = self.video_dicts.get(url)
         if video_info:
             self.preview_widget.set_video(video_info)
             self.quality_combo.add_formats(formats)
+            self.video_sett_combo.add_recode(recode)
 
     def on_quality_changed(self, text):
         self.selected_quality = text
+
+    def on_recode_changed(self, text):
+        self.selected_recode = text
 
     def on_download(self):
         item = self.media_list.currentItem()
         url = item.data(Qt.ItemDataRole.UserRole)
         quality = self.selected_quality
+        recode = self.selected_recode
         output_dir = self.output_dir_line.text().strip()
         errors = []
         if not output_dir:
@@ -106,15 +115,15 @@ class MainWindow(QMainWindow):
             return
 
 
-        self.start_download(url, quality, output_dir)
+        self.start_download(url, quality, recode, output_dir)
 
-    def start_download(self, url, quality, output_dir):
+    def start_download(self, url, quality, recode, output_dir):
         self.start_btn.setEnabled(False)
         video = quality[:-1]
         settings = f"bestvideo[height={video}]+bestaudio/best[height={video}]"
-
+        rec = recode
         self.thread = QThread()
-        self.worker = DownloadWorker(url, settings, output_dir)
+        self.worker = DownloadWorker(url, settings, rec, output_dir)
         self.worker.moveToThread(self.thread)
 
         self.thread.started.connect(self.worker.run)
@@ -122,11 +131,23 @@ class MainWindow(QMainWindow):
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
         self.thread.finished.connect(self.on_download_finished)
+        self.worker.progress.connect(self.update_progress)
 
         self.thread.start()
 
+    def update_progress(self, value):
+        if value == -1:
+            self.status_bar.setRange(0, 0)
+            #self.status_bar.setFormat("ffmpeg working...")
+        else:
+            self.status_bar.setRange(0, 100)
+            self.status_bar.setValue(int(value))
+            self.status_bar.setFormat("%p%")
+
     def on_download_finished(self):
         self.start_btn.setEnabled(True)
+        self.status_bar.setRange(0, 100)
+        self.status_bar.setValue(100)
         QMessageBox.information(self, "Success", "Video downloaded successfully.")
 
     def browse_directory(self):

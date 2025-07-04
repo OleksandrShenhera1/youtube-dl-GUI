@@ -12,20 +12,41 @@ class VideoFormat(QComboBox):
         if formats:
             self.add_formats(formats)
 
-
-
     def add_formats(self, formats):
         if not formats:
             return
         self.clear()
+        if any("2160p" in f for f in formats):
+            self.addItem("2160p")
         if any("1440p" in f for f in formats):
             self.addItem("1440p")
         if any("1080p" in f for f in formats):
             self.addItem("1080p")
         if any("720p" in f for f in formats):
             self.addItem("720p")
+        if any("480p" in f for f in formats):
+            self.addItem("480p")
         if any("360p" in f for f in formats):
             self.addItem("360p")
+
+class DownloadFormat(QComboBox):
+    def __init__(self, recode=None, parent=None):
+        super().__init__(parent)
+        if recode:
+            self.add_recode(recode)
+
+    def add_recode(self, recode):
+        if not recode:
+            return
+        self.clear()
+        if any("mp4" in r for r in recode):
+            self.addItem("mp4")
+        if any("mkv" in r for r in recode):
+            self.addItem("mkv")
+        if any("webm" in r for r in recode):
+            self.addItem("webm")
+        if any("avi" in r for r in recode):
+            self.addItem("avi")
 
 
 
@@ -152,7 +173,8 @@ def create_main_widget(parent_window):
 
     bottom_settings = QHBoxLayout()
 
-    parent_window.video_sett_combo = QComboBox()
+    parent_window.video_sett_combo = DownloadFormat()
+    parent_window.video_sett_combo.currentTextChanged.connect(parent_window.on_recode_changed)
     parent_window.output_dir_line = QLineEdit()
     parent_window.output_dir_line.setPlaceholderText("C:\\User\\Name\\Videos")
     parent_window.output_dir_btn = QPushButton("Browse")
